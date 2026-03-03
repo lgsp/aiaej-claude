@@ -1,0 +1,1704 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MP2I — 4.6 IA et Jeux</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,400;0,500;1,400&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Barlow+Condensed:wght@300;500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#08070e;--bg2:#0e0d1a;--bg3:#141226;--border:#1e1b38;
+  --ac:#c84bff;    /* magenta-violet — IA */
+  --a2:#ff6b6b;    /* rouge — joueur humain */
+  --a3:#ffd166;    /* or   — IA / optimal */
+  --a4:#06d6a0;    /* vert — victoire */
+  --a5:#74b9ff;    /* bleu — profondeur arbre */
+  --text:#c8c0e8;--dim:#3d3660;
+  --mono:'DM Mono',monospace;--serif:'Playfair Display',serif;--cond:'Barlow Condensed',sans-serif;
+  --r:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--serif);font-size:17px;line-height:1.65;min-height:100vh}
+
+#prog{position:fixed;top:0;left:0;height:3px;width:0%;background:linear-gradient(90deg,var(--ac),var(--a2));z-index:1000;transition:width .15s;box-shadow:0 0 8px var(--ac)}
+
+/* ── HEADER ── */
+header{background:var(--bg);border-bottom:1px solid var(--border);padding:3.5rem 2rem 2.5rem;text-align:center;position:relative;overflow:hidden}
+header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% -20%,rgba(200,75,255,.06),transparent);pointer-events:none}
+/* chessboard-like subtle grid */
+header::after{content:'';position:absolute;inset:0;background-image:linear-gradient(rgba(200,75,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(200,75,255,.03) 1px,transparent 1px);background-size:36px 36px;pointer-events:none;opacity:.7}
+.bc{font-family:var(--cond);font-size:.77rem;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;margin-bottom:1rem;position:relative}
+.bc a{color:var(--a5);text-decoration:none}.bc a:hover{text-decoration:underline}
+h1{font-family:var(--cond);font-size:clamp(2rem,5.5vw,3.6rem);font-weight:900;color:#ede8ff;line-height:1.0;margin-bottom:.6rem;position:relative;letter-spacing:-.015em}
+h1 em{font-style:italic;background:linear-gradient(90deg,var(--ac),var(--a2));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.sub{font-family:var(--serif);font-size:1.05rem;color:var(--dim);font-style:italic;margin-bottom:1.5rem;position:relative}
+
+.pills{display:flex;gap:.45rem;justify-content:center;flex-wrap:wrap}
+.pill{font-family:var(--mono);font-size:.67rem;padding:.2rem .62rem;border-radius:20px;border:1px solid;letter-spacing:.06em}
+.ps2{color:var(--a5);border-color:rgba(116,185,255,.3);background:rgba(116,185,255,.05)}
+.pai{color:var(--ac);border-color:rgba(200,75,255,.3);background:rgba(200,75,255,.05)}
+.pc{color:var(--a3);border-color:rgba(255,209,102,.3);background:rgba(255,209,102,.05)}
+.pml{color:var(--a5);border-color:rgba(116,185,255,.3);background:rgba(116,185,255,.05)}
+
+/* NAV */
+nav.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;max-width:900px;margin:0 auto;padding:2rem 1.5rem 0}
+.nc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:.65rem .85rem;cursor:pointer;transition:border-color .2s,background .2s;text-align:center}
+.nc:hover{border-color:var(--ac);background:rgba(200,75,255,.04)}
+.nc-n{font-family:var(--mono);font-size:.66rem;color:var(--ac);letter-spacing:.1em;display:block;margin-bottom:.18rem}
+.nc-t{font-family:var(--cond);font-size:.8rem;font-weight:500;color:var(--text);line-height:1.2}
+.vc{font-family:var(--mono);font-size:.72rem;color:var(--dim);text-align:right;padding:.45rem 1.5rem 0;max-width:900px;margin:0 auto}
+#seen-count{color:var(--ac)}
+
+main{max-width:900px;margin:0 auto;padding:0 1.5rem 4rem}
+
+/* SECTIONS */
+.S{border:1px solid var(--border);border-radius:10px;background:var(--bg2);margin-top:2rem;overflow:hidden}
+.S.seen{border-left:3px solid var(--ac)}
+.Sh{display:flex;align-items:center;gap:1rem;padding:1.2rem 1.5rem;cursor:pointer;user-select:none;border-bottom:1px solid transparent;transition:background .18s}
+.Sh:hover{background:rgba(255,255,255,.015)}
+.Sh.open{border-bottom-color:var(--border)}
+.Sn{font-family:var(--mono);font-size:.72rem;color:var(--ac);background:rgba(200,75,255,.08);border:1px solid rgba(200,75,255,.22);padding:.17rem .52rem;border-radius:4px;flex-shrink:0}
+.St{font-family:var(--cond);font-size:1.1rem;font-weight:500;color:#e0d8ff;flex:1}
+.Sa{font-size:.7rem;color:var(--dim);transition:transform .3s}
+.Sa.open{transform:rotate(180deg)}
+.Sb{padding:1.5rem;display:none}
+.Sb.open{display:block}
+
+/* TYPO */
+h2{font-family:var(--cond);font-weight:700;font-size:1.35rem;color:var(--ac);letter-spacing:.03em;margin-bottom:.7rem;border-bottom:1px solid var(--border);padding-bottom:.35rem;margin-top:.3rem}
+h3{font-family:var(--cond);font-weight:500;font-size:1.05rem;color:var(--a5);margin:1.1rem 0 .45rem}
+p{margin-bottom:.75rem}
+strong{color:#e8e0ff;font-weight:600}
+em{color:var(--a3);font-style:italic}
+code{font-family:var(--mono);font-size:.8em;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.09);border-radius:3px;padding:.08em .38em;color:var(--a3)}
+ul{margin:.45rem 0 .75rem 1.1rem}ul li{margin-bottom:.28rem}
+
+.callout{border-left:3px solid var(--ac);background:rgba(200,75,255,.04);padding:.7rem 1rem;border-radius:0 var(--r) var(--r) 0;margin:.85rem 0;font-size:.91rem}
+.cg{border-left-color:var(--a4);background:rgba(6,214,160,.04)}
+.cy{border-left-color:var(--a3);background:rgba(255,209,102,.04)}
+.cb2{border-left-color:var(--a5);background:rgba(116,185,255,.04)}
+.cr{border-left-color:var(--a2);background:rgba(255,107,107,.04)}
+.ct{font-family:var(--mono);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ac);margin-bottom:.28rem}
+.cg .ct{color:var(--a4)}.cy .ct{color:var(--a3)}.cb2 .ct{color:var(--a5)}.cr .ct{color:var(--a2)}
+
+.tbl{overflow-x:auto;margin:.85rem 0}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th{background:var(--bg3);color:var(--ac);font-family:var(--mono);font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;padding:.55rem .9rem;text-align:left;border-bottom:2px solid var(--border)}
+td{padding:.5rem .9rem;border-bottom:1px solid var(--border);vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,.01)}
+.ok{color:var(--a4);font-family:var(--mono)}.warn{color:var(--a3);font-family:var(--mono)}.bad{color:var(--a2);font-family:var(--mono)}
+
+/* ── GAME PANELS ── */
+.vtabs{display:flex;gap:.3rem;margin-bottom:.85rem;flex-wrap:wrap}
+.vtab{font-family:var(--mono);font-size:.72rem;padding:.28rem .75rem;border-radius:4px;border:1px solid var(--border);background:var(--bg);color:var(--dim);cursor:pointer;transition:all .15s}
+.vtab.active{border-color:var(--ac);color:var(--ac);background:rgba(200,75,255,.07)}
+.vpanel{display:none}.vpanel.active{display:block}
+
+/* ── TIC-TAC-TOE ── */
+.ttt-wrap{display:flex;gap:2rem;flex-wrap:wrap;align-items:flex-start}
+.ttt-board{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;width:222px;flex-shrink:0}
+.ttt-cell{width:68px;height:68px;border-radius:var(--r);border:1.5px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:2rem;cursor:pointer;transition:all .15s;user-select:none}
+.ttt-cell:hover:not(.taken){border-color:var(--ac);background:rgba(200,75,255,.08)}
+.ttt-cell.X{color:var(--a2);border-color:rgba(255,107,107,.4)}
+.ttt-cell.O{color:var(--a3);border-color:rgba(255,209,102,.4)}
+.ttt-cell.win{background:rgba(6,214,160,.12);border-color:var(--a4);animation:winpulse .4s ease}
+.ttt-cell.taken{cursor:default}
+@keyframes winpulse{0%{transform:scale(.9)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
+.ttt-right{flex:1;min-width:200px}
+.ttt-status{font-family:var(--cond);font-size:1.1rem;font-weight:500;color:var(--text);margin-bottom:.75rem}
+.ttt-tree-wrap{overflow:auto;margin-top:1rem;max-height:220px}
+.tree-node{display:inline-block;padding:.15rem .4rem;border-radius:3px;font-family:var(--mono);font-size:.7rem;border:1px solid;margin:.1rem}
+.tn-max{color:var(--ac);border-color:rgba(200,75,255,.3);background:rgba(200,75,255,.06)}
+.tn-min{color:var(--a5);border-color:rgba(116,185,255,.3);background:rgba(116,185,255,.06)}
+.tn-win{color:var(--a4);border-color:rgba(6,214,160,.4);background:rgba(6,214,160,.08)}
+.tn-loss{color:var(--a2);border-color:rgba(255,107,107,.35)}
+.tn-draw{color:var(--dim);border-color:var(--border)}
+.ai-stats{display:flex;gap:1.2rem;flex-wrap:wrap;font-family:var(--mono);font-size:.76rem;margin:.7rem 0}
+.as{display:flex;flex-direction:column;gap:.1rem}
+.asl{color:var(--dim);font-size:.64rem;text-transform:uppercase;letter-spacing:.07em}
+.asv{color:var(--a3);font-size:1.05rem}
+
+/* ── MINIMAX TREE VIZ ── */
+.tree-svg-wrap{overflow-x:auto;padding:.5rem 0;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);margin:.75rem 0}
+#tree-svg{display:block}
+
+/* ── CONNECT FOUR ── */
+.c4-board{display:inline-grid;grid-template-columns:repeat(7,1fr);gap:5px;background:var(--bg3);border:2px solid var(--border);border-radius:8px;padding:8px}
+.c4-cell{width:52px;height:52px;border-radius:50%;background:var(--bg);border:2px solid var(--border);display:flex;align-items:center;justify-content:center;transition:background .2s,border-color .2s}
+.c4-cell.R{background:rgba(255,107,107,.25);border-color:var(--a2)}
+.c4-cell.Y{background:rgba(255,209,102,.2);border-color:var(--a3)}
+.c4-cell.win{animation:c4win .35s ease forwards}
+@keyframes c4win{0%{transform:scale(.85)}60%{transform:scale(1.12)}100%{transform:scale(1);box-shadow:0 0 12px currentColor}}
+.c4-col-btn{width:52px;height:28px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--dim);font-family:var(--mono);font-size:.7rem;cursor:pointer;transition:all .13s;margin:0 2.5px}
+.c4-col-btn:hover{border-color:var(--ac);color:var(--ac);background:rgba(200,75,255,.07)}
+.c4-wrap{overflow-x:auto;padding:.25rem}
+.c4-info{font-family:var(--cond);font-size:1rem;font-weight:500;margin:.65rem 0;color:var(--text)}
+.c4-stats{display:flex;gap:1.2rem;flex-wrap:wrap;font-family:var(--mono);font-size:.76rem;margin:.5rem 0}
+
+/* ── ALPHA-BETA COMPARE ── */
+.ab-compare{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0}
+.ab-box{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:1rem}
+.ab-title{font-family:var(--cond);font-size:.95rem;font-weight:500;margin-bottom:.5rem}
+.ab-bar-wrap{background:var(--border);border-radius:3px;height:10px;margin:.3rem 0;overflow:hidden}
+.ab-bar{height:100%;border-radius:3px;transition:width .5s}
+
+/* ── MCTS ── */
+.mcts-tree{overflow:auto;max-height:240px;font-family:var(--mono);font-size:.76rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.75rem}
+.mcts-node{padding:.2rem 0 .2rem 1.2rem;border-left:1px solid var(--border);margin-left:.6rem;position:relative}
+.mcts-node::before{content:'└';position:absolute;left:.1rem;color:var(--dim)}
+
+/* BTNS */
+.btn{font-family:var(--mono);font-size:.74rem;padding:.32rem .78rem;border-radius:var(--r);border:1px solid;cursor:pointer;transition:all .13s;letter-spacing:.04em}
+.bv{color:var(--ac);border-color:rgba(200,75,255,.4);background:rgba(200,75,255,.07)}.bv:hover{background:rgba(200,75,255,.16)}
+.bg{color:var(--a4);border-color:rgba(6,214,160,.4);background:rgba(6,214,160,.07)}.bg:hover{background:rgba(6,214,160,.16)}
+.by{color:var(--a3);border-color:rgba(255,209,102,.4);background:rgba(255,209,102,.07)}.by:hover{background:rgba(255,209,102,.16)}
+.bb2{color:var(--a5);border-color:rgba(116,185,255,.4);background:rgba(116,185,255,.07)}.bb2:hover{background:rgba(116,185,255,.16)}
+.br{color:var(--a2);border-color:rgba(255,107,107,.4);background:rgba(255,107,107,.07)}.br:hover{background:rgba(255,107,107,.16)}
+.bd{color:var(--dim);border-color:var(--border);background:transparent}.bd:hover{color:var(--text);border-color:var(--dim)}
+.ctrl{display:flex;gap:.45rem;flex-wrap:wrap;align-items:center;margin-bottom:.65rem}
+.srow{display:flex;align-items:center;gap:.65rem;font-family:var(--mono);font-size:.76rem}
+.srow label{color:var(--dim);min-width:80px}
+input[type=range]{flex:1;accent-color:var(--ac)}
+.sv{color:var(--a3);min-width:38px}
+
+/* LANG / CODE */
+.ltabs{display:flex;gap:0;margin:1rem 0 0;border-bottom:1px solid var(--border)}
+.ltab{font-family:var(--mono);font-size:.74rem;padding:.45rem .95rem;cursor:pointer;border:1px solid transparent;border-bottom:none;border-radius:4px 4px 0 0;color:var(--dim);background:transparent;margin-bottom:-1px;transition:all .13s}
+.ltab.ct2.active{color:var(--a3);border-color:var(--border);border-bottom-color:var(--bg2);background:var(--bg2)}
+.ltab.ml.active{color:var(--a5);border-color:var(--border);border-bottom-color:var(--bg2);background:var(--bg2)}
+.lpane{display:none}.lpane.active{display:block}
+.cb{margin:.85rem 0;border-radius:var(--r);border:1px solid var(--border);overflow:hidden}
+.ch{display:flex;align-items:center;gap:.5rem;padding:.48rem .9rem;background:var(--bg3);border-bottom:1px solid var(--border);flex-wrap:wrap}
+.clg{font-family:var(--mono);font-size:.67rem;padding:.12rem .48rem;border-radius:3px;text-transform:uppercase;letter-spacing:.07em;font-weight:500}
+.lc{color:var(--a3);background:rgba(255,209,102,.1);border:1px solid rgba(255,209,102,.22)}
+.lml{color:var(--a5);background:rgba(116,185,255,.1);border:1px solid rgba(116,185,255,.22)}
+.cfn{font-family:var(--mono);font-size:.72rem;color:var(--dim);flex:1}
+.ca{display:flex;gap:.32rem;margin-left:auto}
+.ce{font-family:var(--mono);font-size:.78rem;background:var(--bg);color:var(--text);border:none;outline:none;resize:vertical;width:100%;padding:.9rem;line-height:1.58;tab-size:2;min-height:220px;caret-color:var(--ac)}
+.co{border-top:1px solid var(--border);background:#060408;padding:.65rem .9rem;font-family:var(--mono);font-size:.76rem;color:#c890c8;white-space:pre-wrap;min-height:2.2rem;display:none}
+.co.visible{display:block}
+
+/* QCM */
+.qp{font-family:var(--mono);font-size:.7rem;color:var(--dim);margin-bottom:.9rem}
+.qq{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:1rem 1.2rem;margin-bottom:.9rem}
+.qq p{margin-bottom:.7rem;font-size:.94rem}
+.qo{display:flex;align-items:center;gap:.6rem;padding:.4rem .68rem;border-radius:var(--r);cursor:pointer;margin-bottom:.3rem;border:1px solid var(--border);background:var(--bg);transition:all .13s;font-size:.87rem}
+.qo:hover{border-color:var(--a5);background:rgba(116,185,255,.05)}
+.qo.correct{border-color:var(--a4);background:rgba(6,214,160,.08);color:var(--a4)}
+.qo.wrong{border-color:var(--a2);background:rgba(255,107,107,.08);color:var(--a2)}
+.qo input{accent-color:var(--a4)}
+.qex{font-size:.82rem;font-style:italic;color:var(--dim);margin-top:.45rem;padding:.45rem .68rem;background:var(--bg);border-left:3px solid var(--border);border-radius:0 3px 3px 0}
+.qctrl{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem}
+.sbar{height:6px;border-radius:4px;background:var(--border);margin:.45rem 0;overflow:hidden}
+.sfill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--ac),var(--a5));transition:width .4s}
+
+/* contact */
+.cgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:1rem;margin-top:1rem}
+.cc{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:.9rem;text-align:center}
+.ci{font-size:1.4rem;display:block;margin-bottom:.35rem}
+.ct3{font-family:var(--cond);font-weight:500;color:var(--a5)}
+.cs{font-size:.78rem;color:var(--dim);margin:.18rem 0 .55rem}
+.cc img{width:105px;height:105px;margin:.45rem auto;display:block}
+.cl{font-family:var(--mono);font-size:.69rem;color:var(--ac);text-decoration:none}
+.cl:hover{text-decoration:underline}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="prog"></div>
+
+<header>
+  <div class="bc"><a href="#">MP2I / MPI — Informatique</a> › <a href="#">4. Algorithmique</a> › 4.6 IA et Jeux</div>
+  <h1>IA &amp; <em>Théorie des jeux</em></h1>
+  <p class="sub">Minimax, élagage α-β, MCTS — jouer contre une IA parfaite.</p>
+  <div class="pills">
+    <span class="pill ps2">S2</span>
+    <span class="pill pai">Minimax</span>
+    <span class="pill pai">Alpha-Bêta</span>
+    <span class="pill pai">MCTS</span>
+    <span class="pill pc">C99</span>
+    <span class="pill pml">OCaml</span>
+  </div>
+</header>
+
+<nav class="cards">
+  <div class="nc" onclick="openS(0)"><span class="nc-n">01</span><span class="nc-t">Programme officiel</span></div>
+  <div class="nc" onclick="openS(1)"><span class="nc-n">02</span><span class="nc-t">Jeux interactifs</span></div>
+  <div class="nc" onclick="openS(2)"><span class="nc-n">03</span><span class="nc-t">Cours — Rappels</span></div>
+  <div class="nc" onclick="openS(3)"><span class="nc-n">04</span><span class="nc-t">Code C &amp; OCaml</span></div>
+  <div class="nc" onclick="openS(4)"><span class="nc-n">05</span><span class="nc-t">Auto-évaluation</span></div>
+  <div class="nc" onclick="openS(5)"><span class="nc-n">06</span><span class="nc-t">Contact</span></div>
+</nav>
+<div class="vc"><span id="seen-count">0</span> / 6 vus</div>
+
+<main>
+
+<!-- ══ 01 PROGRAMME ══ -->
+<div class="S" id="sec-0">
+  <div class="Sh" onclick="toggleS(0)"><span class="Sn">01</span><span class="St">Notions du programme officiel</span><span class="Sa" id="a0">▼</span></div>
+  <div class="Sb" id="b0">
+    <p>Extrait exact du <strong>BO 2021</strong> — section <strong>4.6 Algorithmique pour l'intelligence artificielle, étude des jeux</strong>.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Notion</th><th>Commentaires officiels</th><th>Période</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Modélisation d'un jeu à deux joueurs</strong></td><td>Jeux à information complète, déterministes, à somme nulle. Arbre de jeu. États terminaux et fonction d'évaluation.</td><td><span class="pill ps2" style="font-size:.68rem">S2</span></td></tr>
+        <tr><td><strong>Algorithme Minimax</strong></td><td>Parcours de l'arbre de jeu : le joueur MAX cherche à maximiser son score, le joueur MIN cherche à le minimiser. Complexité O(b^d) où b = facteur de branchement et d = profondeur.</td><td><span class="pill ps2" style="font-size:.68rem">S2</span></td></tr>
+        <tr><td><strong>Élagage alpha-bêta</strong></td><td>Optimisation de Minimax : couper les branches qui ne peuvent pas influencer le résultat. Dans le meilleur cas, la complexité est réduite à O(b^{d/2}).</td><td><span class="pill ps2" style="font-size:.68rem">S2</span></td></tr>
+        <tr><td><strong>Heuristiques d'évaluation</strong></td><td>Quand la profondeur complète est inaccessible, on utilise une fonction d'évaluation heuristique pour estimer la valeur d'un état non terminal.</td><td><span class="pill ps2" style="font-size:.68rem">S2</span></td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout"><div class="ct">Point clé du programme</div>
+      Le programme insiste sur la <strong>compréhension de l'arbre de jeu</strong>, la preuve de correction de Minimax, et l'effet de l'élagage α-β sur la complexité. La notion de <strong>jeu à somme nulle</strong> et la distinction entre MAX et MIN sont centrales.
+    </div>
+  </div>
+</div>
+
+<!-- ══ 02 SIMULATEURS ══ -->
+<div class="S" id="sec-1">
+  <div class="Sh" onclick="toggleS(1)"><span class="Sn">02</span><span class="St">Jeux interactifs — Jouer contre l'IA</span><span class="Sa" id="a1">▼</span></div>
+  <div class="Sb" id="b1">
+    <div class="vtabs">
+      <button class="vtab active" onclick="showViz('ttt')">Tic-tac-toe (Minimax)</button>
+      <button class="vtab" onclick="showViz('c4')">Puissance 4 (α-β)</button>
+      <button class="vtab" onclick="showViz('abtree')">Arbre α-β interactif</button>
+    </div>
+
+    <!-- TIC-TAC-TOE -->
+    <div class="vpanel active" id="vp-ttt">
+      <p style="font-size:.88rem;margin-bottom:.75rem">Jouez contre une IA <strong>parfaite</strong> (Minimax complet). Elle ne peut jamais perdre. Observez l'arbre de décision exploré.</p>
+      <div class="ctrl">
+        <button class="btn bv" onclick="tttNewGame()">⊞ Nouvelle partie</button>
+        <button class="btn by" id="ttt-depth-btn" onclick="tttToggleDepth()">Mode : Parfait</button>
+        <button class="btn bd" id="ttt-first" onclick="tttToggleFirst()">Vous jouez X (premier)</button>
+      </div>
+      <div class="ttt-wrap">
+        <div>
+          <div class="ttt-board" id="ttt-board"></div>
+          <div class="ai-stats" style="margin-top:.75rem">
+            <div class="as"><span class="asl">Nœuds explorés</span><span class="asv" id="ttt-nodes">0</span></div>
+            <div class="as"><span class="asl">Élagages α-β</span><span class="asv" id="ttt-prunes">0</span></div>
+            <div class="as"><span class="asl">Meilleur score</span><span class="asv" id="ttt-score">—</span></div>
+          </div>
+        </div>
+        <div class="ttt-right">
+          <div class="ttt-status" id="ttt-status">À vous de jouer (X)</div>
+          <p style="font-size:.83rem;color:var(--dim)">Les valeurs affichées sur le plateau sont les scores Minimax de chaque coup possible.</p>
+          <div style="display:flex;gap:.75rem;margin:.5rem 0;font-family:var(--mono);font-size:.76rem;flex-wrap:wrap">
+            <span style="color:var(--a4)">● +1 : IA gagne</span>
+            <span style="color:var(--dim)">● 0 : nul</span>
+            <span style="color:var(--a2)">● -1 : vous gagnez</span>
+          </div>
+          <div id="ttt-hint" style="font-family:var(--mono);font-size:.78rem;color:var(--dim);padding:.5rem .75rem;background:var(--bg3);border-radius:var(--r);min-height:2rem;margin-top:.5rem"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PUISSANCE 4 -->
+    <div class="vpanel" id="vp-c4">
+      <p style="font-size:.88rem;margin-bottom:.75rem">Jouez contre une IA utilisant <strong>Minimax avec élagage α-β</strong> et une fonction d'évaluation heuristique. Profondeur configurable.</p>
+      <div class="ctrl">
+        <button class="btn bv" onclick="c4NewGame()">⊞ Nouvelle partie</button>
+        <div class="srow" style="flex:1">
+          <label>Profondeur IA :</label>
+          <input type="range" id="c4-depth" min="2" max="6" value="4" oninput="document.getElementById('c4-dv').textContent=this.value">
+          <span class="sv" id="c4-dv">4</span>
+        </div>
+        <button class="btn bd" id="c4-first" onclick="c4ToggleFirst()">Vous jouez Rouge (1er)</button>
+      </div>
+      <div class="c4-wrap">
+        <div id="c4-col-btns" style="display:flex;gap:5px;padding:0 8px;margin-bottom:3px"></div>
+        <div class="c4-board" id="c4-board"></div>
+      </div>
+      <div class="c4-info" id="c4-info">À vous de jouer (🔴)</div>
+      <div class="c4-stats">
+        <div class="as"><span class="asl">Nœuds explorés</span><span class="asv" id="c4-nodes">0</span></div>
+        <div class="as"><span class="asl">Élagages α-β</span><span class="asv" id="c4-prunes">0</span></div>
+        <div class="as"><span class="asl">Score heuristique</span><span class="asv" id="c4-eval">—</span></div>
+        <div class="as"><span class="asl">Profondeur explorée</span><span class="asv" id="c4-depth-reached">0</span></div>
+      </div>
+    </div>
+
+    <!-- ARBRE AB -->
+    <div class="vpanel" id="vp-abtree">
+      <p style="font-size:.88rem;margin-bottom:.75rem">Visualisation interactive de l'élagage <strong>alpha-bêta</strong> sur un arbre de jeu abstrait. Les branches <span style="color:var(--a2)">rouges</span> sont élagées.</p>
+      <div class="ctrl">
+        <button class="btn bv" onclick="abtreeStep()">→ Étape suivante</button>
+        <button class="btn by" onclick="abtreeAll()">⏩ Tout exécuter</button>
+        <button class="btn bd" onclick="abtreeReset()">↺ Reset</button>
+        <button class="btn bb2" onclick="abtreeNew()">⊞ Nouvel arbre</button>
+      </div>
+      <div class="tree-svg-wrap"><svg id="tree-svg" width="840" height="300"></svg></div>
+      <div style="display:flex;gap:1.2rem;font-family:var(--mono);font-size:.76rem;flex-wrap:wrap;margin-top:.5rem">
+        <div class="as"><span class="asl">Nœuds évalués (Minimax)</span><span class="asv" id="ab-full">0</span></div>
+        <div class="as"><span class="asl">Nœuds évalués (α-β)</span><span class="asv" id="ab-pruned">0</span></div>
+        <div class="as"><span class="asl">Élagages</span><span class="asv" id="ab-cuts">0</span></div>
+        <div class="as"><span class="asl">Réduction</span><span class="asv" id="ab-reduction">—</span></div>
+      </div>
+      <div id="ab-log" style="font-family:var(--mono);font-size:.76rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.65rem .85rem;margin-top:.6rem;min-height:2rem;max-height:100px;overflow-y:auto;color:var(--dim)">Appuyez sur → Étape</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 03 COURS ══ -->
+<div class="S" id="sec-2">
+  <div class="Sh" onclick="toggleS(2)"><span class="Sn">03</span><span class="St">Cours — Rappels et définitions</span><span class="Sa" id="a2">▼</span></div>
+  <div class="Sb" id="b2">
+
+    <h2>4.6.1 — Modélisation d'un jeu</h2>
+    <p>On considère des jeux à <strong>deux joueurs</strong>, <strong>information complète</strong>, <strong>déterministes</strong> et à <strong>somme nulle</strong> (ce que gagne l'un est perdu par l'autre).</p>
+    <div class="tbl"><table>
+      <thead><tr><th>Composante</th><th>Définition</th><th>Exemple (Tic-tac-toe)</th></tr></thead>
+      <tbody>
+        <tr><td><strong>État</strong></td><td>Configuration courante du jeu</td><td>Position des X et O sur l'échiquier</td></tr>
+        <tr><td><strong>Joueurs</strong></td><td>MAX et MIN (alternent)</td><td>X (MAX) et O (MIN)</td></tr>
+        <tr><td><strong>Coups</strong></td><td>Actions légales depuis un état</td><td>Cases vides disponibles</td></tr>
+        <tr><td><strong>État terminal</strong></td><td>Partie terminée (victoire, défaite, nul)</td><td>Alignement ou plateau plein</td></tr>
+        <tr><td><strong>Utilité</strong></td><td>Valeur numérique d'un état terminal pour MAX</td><td>+1 (victoire MAX), -1 (victoire MIN), 0 (nul)</td></tr>
+      </tbody>
+    </table></div>
+
+    <h2 style="margin-top:1.3rem">4.6.2 — Algorithme Minimax</h2>
+    <div class="callout cb2"><div class="ct">Définition récursive</div>
+      <code>minimax(état, estMax) :</code><br>
+      <code>&nbsp;&nbsp;si état terminal → retourner utilité(état)</code><br>
+      <code>&nbsp;&nbsp;si estMax → retourner max sur coups c de minimax(appliquer(état,c), false)</code><br>
+      <code>&nbsp;&nbsp;sinon   → retourner min sur coups c de minimax(appliquer(état,c), true)</code>
+    </div>
+    <div class="callout cy"><div class="ct">Invariant / Propriété fondamentale</div>
+      Minimax retourne la <strong>valeur du jeu</strong> sous jeu optimal des deux joueurs. Si les deux joueurs jouent parfaitement, la valeur du jeu est déterminée et unique.
+    </div>
+    <div class="callout cr"><div class="ct">Complexité</div>
+      <strong>Temps :</strong> O(b^d) — b = facteur de branchement, d = profondeur de l'arbre.<br>
+      <strong>Espace :</strong> O(b·d) (pile de récursion).<br>
+      Tic-tac-toe : b ≤ 9, d ≤ 9 → au plus 9! = 362 880 nœuds. Échecs : b ≈ 35, d ≈ 80 → impraticable sans optimisation.
+    </div>
+
+    <h2 style="margin-top:1.3rem">4.6.3 — Élagage Alpha-Bêta</h2>
+    <p>L'élagage α-β coupe les branches de l'arbre Minimax qui <em>ne peuvent pas influencer la décision finale</em>. On maintient deux bornes :</p>
+    <div class="callout cg"><div class="ct">Bornes α et β</div>
+      <strong>α</strong> = meilleure valeur que MAX peut garantir (initialement −∞)<br>
+      <strong>β</strong> = meilleure valeur que MIN peut garantir (initialement +∞)<br><br>
+      <strong>Coupure α :</strong> nœud MIN, on retourne si valeur ≤ α (MAX n'ira jamais ici).<br>
+      <strong>Coupure β :</strong> nœud MAX, on retourne si valeur ≥ β (MIN n'ira jamais ici).
+    </div>
+    <div class="tbl"><table>
+      <thead><tr><th>Cas</th><th>Nœuds explorés</th><th>Complexité</th></tr></thead>
+      <tbody>
+        <tr><td>Minimax pur</td><td class="bad">b^d</td><td class="bad">O(b^d)</td></tr>
+        <tr><td>α-β, pire cas (ordre aléatoire)</td><td class="warn">~b^d</td><td class="warn">O(b^d)</td></tr>
+        <tr><td>α-β, meilleur cas (ordre parfait)</td><td class="ok">b^{d/2}</td><td class="ok">O(b^{d/2})</td></tr>
+        <tr><td>α-β, cas moyen (ordre aléatoire)</td><td class="warn">b^{3d/4}</td><td class="warn">O(b^{3d/4})</td></tr>
+      </tbody>
+    </table></div>
+    <div class="callout"><div class="ct">Interprétation</div>
+      Dans le meilleur cas, α-β réduit le facteur de branchement effectif de b à √b. Pour les échecs (b≈35), cela passe de 35^d à 6^d — une réduction spectaculaire permettant d'aller deux fois plus profond à effort égal.
+    </div>
+
+    <h2 style="margin-top:1.3rem">4.6.4 — Heuristiques et profondeur limitée</h2>
+    <p>Pour les jeux complexes (échecs, Go), parcourir l'arbre entier est impossible. On limite la profondeur et on remplace <code>utilité</code> par une <em>fonction d'évaluation heuristique</em>.</p>
+    <div class="callout cy"><div class="ct">Exemples de fonctions heuristiques</div>
+      <ul style="margin:.3rem 0 0 1rem">
+        <li><strong>Tic-tac-toe :</strong> nombre de lignes/colonnes/diagonales encore gagnables par MAX moins celles de MIN.</li>
+        <li><strong>Puissance 4 :</strong> compter les séquences de 2 ou 3 pions, pondérées par leur potentiel.</li>
+        <li><strong>Échecs :</strong> matériel (valeur des pièces) + mobilité + structure de pions + sécurité du roi.</li>
+      </ul>
+    </div>
+    <div class="callout cb2"><div class="ct">MCTS — Monte Carlo Tree Search (hors programme, culture)</div>
+      Alternatif à Minimax pour les jeux à grand espace d'états (Go). Simulations aléatoires depuis chaque état pour estimer la valeur sans fonction d'évaluation explicite. Compromis exploration/exploitation via la formule UCB1 : <code>UCB1(n) = v̄(n) + c·√(ln(N)/n_i)</code>. AlphaGo et AlphaZero combinent MCTS + réseau de neurones.
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ 04 CODE ══ -->
+<div class="S" id="sec-3">
+  <div class="Sh" onclick="toggleS(3)"><span class="Sn">04</span><span class="St">Exemples de code en C et OCaml</span><span class="Sa" id="a3">▼</span></div>
+  <div class="Sb" id="b3">
+
+    <h2>① Minimax — Tic-tac-toe</h2>
+    <div class="ltabs">
+      <button class="ltab ct2 active" onclick="swL(this,'c1')">C99</button>
+      <button class="ltab ml" onclick="swL(this,'c1')">OCaml</button>
+    </div>
+    <div class="lpane active" id="c1-c"><div class="cb">
+      <div class="ch"><span class="clg lc">C99</span><span class="cfn">minimax_ttt.c</span><div class="ca">
+        <button class="btn bg" onclick="runC(this)">▶ Simuler</button>
+        <button class="btn bb2" onclick="dlC(this,'.c')">↓ .c</button>
+        <button class="btn bd" onclick="rstC(this)">↺</button>
+      </div></div>
+      <textarea class="ce" spellcheck="false">
+#include <stdio.h>
+#include <limits.h>
+#include <stdbool.h>
+
+/* ── Minimax pour le Tic-tac-toe ──
+ *
+ * Plateau : tableau[9], 0=vide, 1=X (MAX), -1=O (MIN).
+ * Invariant de minimax : retourne la valeur du jeu sous jeu optimal.
+ *   +1 si X gagne, -1 si O gagne, 0 si nul.
+ *
+ * Précondition  : plateau valide, tour ∈ {1, -1}
+ * Postcondition : retourne la valeur optimale pour le joueur courant
+ * Complexité    : O(9!) = O(362880) nœuds au max
+ */
+int noeuds_explores = 0;
+int elagages = 0;
+
+/* Vérifie si 'joueur' a gagné */
+bool a_gagne(int p[9], int joueur) {
+    int lignes[8][3] = {{0,1,2},{3,4,5},{6,7,8},{0,3,6},{1,4,7},{2,5,8},{0,4,8},{2,4,6}};
+    for (int i = 0; i < 8; i++)
+        if (p[lignes[i][0]]==joueur && p[lignes[i][1]]==joueur && p[lignes[i][2]]==joueur)
+            return true;
+    return false;
+}
+
+bool plateau_plein(int p[9]) {
+    for (int i = 0; i < 9; i++) if (p[i] == 0) return false;
+    return true;
+}
+
+/* Minimax avec élagage α-β
+ * tour  : +1 (MAX=X) ou -1 (MIN=O)
+ * alpha : meilleure valeur garantie pour MAX (initialement -INF)
+ * beta  : meilleure valeur garantie pour MIN (initialement +INF)
+ *
+ * Invariant : alpha <= valeur_optimal <= beta
+ *   On coupe (β-coupure) quand valeur >= beta au nœud MAX
+ *   On coupe (α-coupure) quand valeur <= alpha au nœud MIN
+ */
+int minimax(int p[9], int tour, int alpha, int beta, int profondeur) {
+    noeuds_explores++;
+    if (a_gagne(p, 1))  return +1;   /* X gagne */
+    if (a_gagne(p, -1)) return -1;   /* O gagne */
+    if (plateau_plein(p)) return 0;  /* nul */
+
+    int meilleur = (tour == 1) ? INT_MIN : INT_MAX;
+    for (int i = 0; i < 9; i++) {
+        if (p[i] != 0) continue;
+        p[i] = tour;
+        int val = minimax(p, -tour, alpha, beta, profondeur + 1);
+        p[i] = 0;  /* backtrack */
+
+        if (tour == 1) {  /* MAX */
+            if (val > meilleur) meilleur = val;
+            if (val > alpha) alpha = val;
+        } else {           /* MIN */
+            if (val < meilleur) meilleur = val;
+            if (val < beta) beta = val;
+        }
+        if (alpha >= beta) { elagages++; break; }  /* coupure α-β */
+    }
+    return meilleur;
+}
+
+/* Trouver le meilleur coup pour X (MAX) */
+int meilleur_coup(int p[9]) {
+    int bestVal = INT_MIN, bestIdx = -1;
+    for (int i = 0; i < 9; i++) {
+        if (p[i] != 0) continue;
+        p[i] = 1;
+        int val = minimax(p, -1, INT_MIN, INT_MAX, 0);
+        p[i] = 0;
+        printf("  Case %d : score Minimax = %+d\n", i, val);
+        if (val > bestVal) { bestVal = val; bestIdx = i; }
+    }
+    return bestIdx;
+}
+
+void afficher(int p[9]) {
+    const char sym[] = " OX"; /* -1→'O', 0→' ', 1→'X' */
+    printf("+---+---+---+\n");
+    for (int r = 0; r < 3; r++) {
+        printf("| %c | %c | %c |\n", sym[p[r*3]+1], sym[p[r*3+1]+1], sym[p[r*3+2]+1]);
+        printf("+---+---+---+\n");
+    }
+}
+
+int main(void) {
+    /* Position de test : X à jouer, situation tendue */
+    int plateau[9] = {1, -1, 0,
+                      0,  1, 0,
+                     -1,  0, 0};
+    printf("Position initiale (X à jouer) :\n");
+    afficher(plateau);
+
+    int coup = meilleur_coup(plateau);
+    printf("\nMeilleur coup pour X : case %d\n", coup);
+    printf("Nœuds explorés : %d\n", noeuds_explores);
+    printf("Élagages α-β    : %d\n", elagages);
+
+    plateau[coup] = 1;
+    printf("\nAprès le coup de X :\n");
+    afficher(plateau);
+    printf("X %s\n", a_gagne(plateau, 1) ? "GAGNE !" : "ne gagne pas encore");
+    return 0;
+}
+      </textarea><div class="co"></div>
+    </div></div>
+    <div class="lpane" id="c1-ml"><div class="cb">
+      <div class="ch"><span class="clg lml">OCaml</span><span class="cfn">minimax_ttt.ml</span><div class="ca">
+        <button class="btn bg" onclick="runC(this)">▶ Simuler</button>
+        <button class="btn bb2" onclick="dlC(this,'.ml')">↓ .ml</button>
+        <button class="btn bd" onclick="rstC(this)">↺</button>
+      </div></div>
+      <textarea class="ce" spellcheck="false">
+(* Minimax avec élagage α-β pour le Tic-tac-toe en OCaml
+ *
+ * Plateau : int array de taille 9
+ *   0 = vide, 1 = X (MAX), -1 = O (MIN)
+ *
+ * Invariant : minimax retourne la valeur du jeu sous jeu optimal.
+ *   Précondition  : plateau valide, tour ∈ {1, -1}
+ *   Postcondition : valeur ∈ {-1, 0, +1}
+ *)
+let noeuds = ref 0
+let elagages = ref 0
+
+let lignes = [|[|0;1;2|];[|3;4;5|];[|6;7;8|];
+               [|0;3;6|];[|1;4;7|];[|2;5;8|];
+               [|0;4;8|];[|2;4;6|]|]
+
+let a_gagne p joueur =
+  Array.exists (fun l -> Array.for_all (fun i -> p.(i) = joueur) l) lignes
+
+let plateau_plein p = Array.for_all (fun c -> c <> 0) p
+
+(* minimax : int array -> int -> int -> int -> int
+ * Élagage α-β : coupe quand alpha >= beta.
+ * Invariant : alpha = max garanti pour MAX, beta = max garanti pour MIN
+ *)
+let rec minimax p tour alpha beta =
+  incr noeuds;
+  if a_gagne p 1  then 1
+  else if a_gagne p (-1) then -1
+  else if plateau_plein p then 0
+  else begin
+    let meilleur = ref (if tour = 1 then -2 else 2) in
+    let alpha = ref alpha and beta = ref beta in
+    let i = ref 0 and coupe = ref false in
+    while !i < 9 && not !coupe do
+      if p.(!i) = 0 then begin
+        p.(!i) <- tour;
+        let v = minimax p (-tour) !alpha !beta in
+        p.(!i) <- 0;
+        if tour = 1 then begin
+          if v > !meilleur then meilleur := v;
+          if v > !alpha then alpha := v
+        end else begin
+          if v < !meilleur then meilleur := v;
+          if v < !beta then beta := v
+        end;
+        if !alpha >= !beta then begin incr elagages; coupe := true end
+      end;
+      incr i
+    done;
+    !meilleur
+  end
+
+let meilleur_coup p =
+  let best_val = ref (-2) and best_idx = ref (-1) in
+  for i = 0 to 8 do
+    if p.(i) = 0 then begin
+      p.(i) <- 1;
+      let v = minimax p (-1) (-2) 2 in
+      p.(i) <- 0;
+      Printf.printf "  Case %d : score = %+d\n" i v;
+      if v > !best_val then begin best_val := v; best_idx := i end
+    end
+  done;
+  !best_idx
+
+let sym = function -1 -> 'O' | 1 -> 'X' | _ -> '.'
+
+let afficher p =
+  Printf.printf "+---+---+---+\n";
+  for r = 0 to 2 do
+    Printf.printf "| %c | %c | %c |\n"
+      (sym p.(r*3)) (sym p.(r*3+1)) (sym p.(r*3+2));
+    Printf.printf "+---+---+---+\n"
+  done
+
+let () =
+  let p = [|1;-1;0; 0;1;0; -1;0;0|] in
+  Printf.printf "Position initiale (X à jouer) :\n";
+  afficher p;
+  let coup = meilleur_coup p in
+  Printf.printf "\nMeilleur coup pour X : case %d\n" coup;
+  Printf.printf "Nœuds explorés : %d\n" !noeuds;
+  Printf.printf "Élagages α-β   : %d\n" !elagages;
+  p.(coup) <- 1;
+  Printf.printf "\nAprès le coup de X :\n";
+  afficher p;
+  Printf.printf "X %s\n" (if a_gagne p 1 then "GAGNE !" else "ne gagne pas encore")
+      </textarea><div class="co"></div>
+    </div></div>
+
+    <h2 style="margin-top:1.4rem">② Minimax avec α-β — Puissance 4</h2>
+    <div class="ltabs">
+      <button class="ltab ct2 active" onclick="swL(this,'c2')">C99</button>
+      <button class="ltab ml" onclick="swL(this,'c2')">OCaml</button>
+    </div>
+    <div class="lpane active" id="c2-c"><div class="cb">
+      <div class="ch"><span class="clg lc">C99</span><span class="cfn">alphabeta_c4.c</span><div class="ca">
+        <button class="btn bg" onclick="runC(this)">▶ Simuler</button>
+        <button class="btn bb2" onclick="dlC(this,'.c')">↓ .c</button>
+        <button class="btn bd" onclick="rstC(this)">↺</button>
+      </div></div>
+      <textarea class="ce" spellcheck="false">
+#include <stdio.h>
+#include <limits.h>
+#include <stdbool.h>
+#include <string.h>
+
+/* ── Puissance 4 — Minimax avec élagage α-β ──
+ *
+ * Plateau : 6 lignes × 7 colonnes
+ * Joueurs : +1 (MAX, Rouge) et -1 (MIN, Jaune)
+ *
+ * Heuristique : évaluer les fenêtres de 4 cases (lignes, cols, diags).
+ *   Fenêtre de 3 pions MAX = +10, 2 pions = +1
+ *   Fenêtre de 3 pions MIN = -10, 2 pions = -1
+ *   Centre préféré (pondération)
+ *
+ * Précondition  : profondeur >= 0, plateau valide
+ * Postcondition : retourne la valeur minimax de l'état courant
+ * Complexité    : O(7^d) sans α-β, O(7^{d/2}) au mieux avec α-β
+ */
+#define LIGNES 6
+#define COLS   7
+#define PROFMAX 6
+
+int noeuds = 0, elagages = 0;
+
+typedef struct { int g[LIGNES][COLS]; } Plateau;
+
+bool est_valide(const Plateau *p, int col) {
+    return p->g[0][col] == 0;
+}
+
+int jouer_coup(Plateau *p, int col, int joueur) {
+    for (int l = LIGNES-1; l >= 0; l--) {
+        if (p->g[l][col] == 0) { p->g[l][col] = joueur; return l; }
+    }
+    return -1;
+}
+
+void annuler_coup(Plateau *p, int col) {
+    for (int l = 0; l < LIGNES; l++) {
+        if (p->g[l][col] != 0) { p->g[l][col] = 0; return; }
+    }
+}
+
+bool verif_victoire(const Plateau *p, int joueur) {
+    /* Horizontal */
+    for (int l = 0; l < LIGNES; l++)
+        for (int c = 0; c <= COLS-4; c++)
+            if (p->g[l][c]==joueur&&p->g[l][c+1]==joueur&&p->g[l][c+2]==joueur&&p->g[l][c+3]==joueur) return true;
+    /* Vertical */
+    for (int l = 0; l <= LIGNES-4; l++)
+        for (int c = 0; c < COLS; c++)
+            if (p->g[l][c]==joueur&&p->g[l+1][c]==joueur&&p->g[l+2][c]==joueur&&p->g[l+3][c]==joueur) return true;
+    /* Diagonale ↘ */
+    for (int l = 0; l <= LIGNES-4; l++)
+        for (int c = 0; c <= COLS-4; c++)
+            if (p->g[l][c]==joueur&&p->g[l+1][c+1]==joueur&&p->g[l+2][c+2]==joueur&&p->g[l+3][c+3]==joueur) return true;
+    /* Diagonale ↗ */
+    for (int l = 3; l < LIGNES; l++)
+        for (int c = 0; c <= COLS-4; c++)
+            if (p->g[l][c]==joueur&&p->g[l-1][c+1]==joueur&&p->g[l-2][c+2]==joueur&&p->g[l-3][c+3]==joueur) return true;
+    return false;
+}
+
+/* Évalue une fenêtre de 4 cases pour le joueur MAX (+1) */
+int eval_fenetre(int f[4]) {
+    int nb_max=0, nb_min=0, nb_vide=0;
+    for (int i=0;i<4;i++) {
+        if (f[i]==1) nb_max++;
+        else if (f[i]==-1) nb_min++;
+        else nb_vide++;
+    }
+    if (nb_max==4) return 100;
+    if (nb_min==4) return -100;
+    if (nb_max==3 && nb_vide==1) return 5;
+    if (nb_max==2 && nb_vide==2) return 2;
+    if (nb_min==3 && nb_vide==1) return -5;
+    if (nb_min==2 && nb_vide==2) return -2;
+    return 0;
+}
+
+int evaluer(const Plateau *p) {
+    int score = 0;
+    int f[4];
+    /* Centre préféré */
+    for (int l=0; l<LIGNES; l++) if (p->g[l][3]==1) score+=3; else if (p->g[l][3]==-1) score-=3;
+    /* Fenêtres horizontales */
+    for (int l=0;l<LIGNES;l++) for (int c=0;c<=COLS-4;c++) {
+        for (int k=0;k<4;k++) f[k]=p->g[l][c+k];
+        score+=eval_fenetre(f);
+    }
+    /* Fenêtres verticales */
+    for (int c=0;c<COLS;c++) for (int l=0;l<=LIGNES-4;l++) {
+        for (int k=0;k<4;k++) f[k]=p->g[l+k][c];
+        score+=eval_fenetre(f);
+    }
+    /* Diagonales */
+    for (int l=0;l<=LIGNES-4;l++) for (int c=0;c<=COLS-4;c++) {
+        for (int k=0;k<4;k++) f[k]=p->g[l+k][c+k];
+        score+=eval_fenetre(f);
+        for (int k=0;k<4;k++) f[k]=p->g[l+3-k][c+k];
+        score+=eval_fenetre(f);
+    }
+    return score;
+}
+
+/* Minimax α-β
+ * Invariant : alpha <= valeur_optimale <= beta
+ * Postcondition : retourne la valeur de l'état sous jeu optimal
+ */
+int alphabeta(Plateau *p, int prof, int alpha, int beta, bool estMax) {
+    noeuds++;
+    if (verif_victoire(p,1))  return +10000;
+    if (verif_victoire(p,-1)) return -10000;
+    if (prof == 0) return evaluer(p);
+    if (estMax) {
+        int best = INT_MIN;
+        for (int c=0; c<COLS; c++) {
+            if (!est_valide(p,c)) continue;
+            jouer_coup(p,c,1);
+            int val = alphabeta(p,prof-1,alpha,beta,false);
+            annuler_coup(p,c);
+            if (val>best) best=val;
+            if (val>alpha) alpha=val;
+            if (alpha>=beta) { elagages++; break; }
+        }
+        return best;
+    } else {
+        int best = INT_MAX;
+        for (int c=0; c<COLS; c++) {
+            if (!est_valide(p,c)) continue;
+            jouer_coup(p,c,-1);
+            int val = alphabeta(p,prof-1,alpha,beta,true);
+            annuler_coup(p,c);
+            if (val<best) best=val;
+            if (val<beta) beta=val;
+            if (alpha>=beta) { elagages++; break; }
+        }
+        return best;
+    }
+}
+
+int meilleur_coup_c4(Plateau *p, int joueur) {
+    int best_val=(joueur==1)?INT_MIN:INT_MAX, best_col=3;
+    for (int c=0; c<COLS; c++) {
+        if (!est_valide(p,c)) continue;
+        jouer_coup(p,c,joueur);
+        int val=alphabeta(p,PROFMAX-1,INT_MIN,INT_MAX,joueur==-1);
+        annuler_coup(p,c);
+        printf("  Col %d : eval=%d\n", c, val);
+        if (joueur==1 && val>best_val) { best_val=val; best_col=c; }
+        if (joueur==-1 && val<best_val) { best_val=val; best_col=c; }
+    }
+    return best_col;
+}
+
+int main(void) {
+    Plateau p; memset(&p,0,sizeof(p));
+    /* Quelques coups pour créer une position */
+    jouer_coup(&p,3,1); jouer_coup(&p,3,-1);
+    jouer_coup(&p,4,1); jouer_coup(&p,4,-1);
+    jouer_coup(&p,2,1);
+
+    printf("Position (X joue, profondeur=%d) :\n", PROFMAX);
+    for (int l=0;l<LIGNES;l++){
+        for (int c=0;c<COLS;c++) printf("%c ", p.g[l][c]==1?'R':p.g[l][c]==-1?'J':'.');
+        printf("\n");
+    }
+    printf("\nÉvaluation des colonnes pour Rouge :\n");
+    int col = meilleur_coup_c4(&p, 1);
+    printf("\nMeilleure colonne : %d\n", col);
+    printf("Nœuds explorés : %d\n", noeuds);
+    printf("Élagages α-β   : %d  (%.0f%%)\n", elagages,
+           100.0*elagages/(noeuds+1));
+    return 0;
+}
+      </textarea><div class="co"></div>
+    </div></div>
+    <div class="lpane" id="c2-ml"><div class="cb">
+      <div class="ch"><span class="clg lml">OCaml</span><span class="cfn">alphabeta_c4.ml</span><div class="ca">
+        <button class="btn bg" onclick="runC(this)">▶ Simuler</button>
+        <button class="btn bb2" onclick="dlC(this,'.ml')">↓ .ml</button>
+        <button class="btn bd" onclick="rstC(this)">↺</button>
+      </div></div>
+      <textarea class="ce" spellcheck="false">
+(* Puissance 4 — Minimax α-β en OCaml
+ *
+ * Plateau : int array array, 6×7
+ * Heuristique : évaluation des fenêtres de 4 cases.
+ *
+ * Invariant alphabeta : alpha <= valeur_optimale <= beta
+ *   Coupure beta  : nœud MAX, valeur >= beta → couper
+ *   Coupure alpha : nœud MIN, valeur <= alpha → couper
+ *)
+let lignes = 6 and cols = 7 and profmax = 5
+let inf = 100_000
+
+let make_plateau () = Array.make_matrix lignes cols 0
+
+let est_valide p c = p.(0).(c) = 0
+
+let jouer p c joueur =
+  let l = ref (lignes-1) in
+  while p.(!l).(c) <> 0 do decr l done;
+  p.(!l).(c) <- joueur; !l
+
+let annuler p c =
+  let l = ref 0 in
+  while p.(!l).(c) = 0 do incr l done;
+  p.(!l).(c) <- 0
+
+let verif_victoire p j =
+  let ok l0 c0 dl dc =
+    let ok = ref true in
+    for k = 0 to 3 do if p.(l0+k*dl).(c0+k*dc) <> j then ok := false done; !ok in
+  let found = ref false in
+  for l = 0 to lignes-1 do for c = 0 to cols-1 do
+    if c <= cols-4 && ok l c 0 1 then found := true;
+    if l <= lignes-4 && ok l c 1 0 then found := true;
+    if l <= lignes-4 && c <= cols-4 && ok l c 1 1 then found := true;
+    if l >= 3 && c <= cols-4 && ok l c (-1) 1 then found := true;
+  done done; !found
+
+let eval_fenetre f =
+  let nb_max = Array.fold_left (fun a x -> if x=1 then a+1 else a) 0 f in
+  let nb_min = Array.fold_left (fun a x -> if x= -1 then a+1 else a) 0 f in
+  let vide = 4 - nb_max - nb_min in
+  if nb_max=4 then 100 else if nb_min=4 then -100
+  else if nb_max=3 && vide=1 then 5
+  else if nb_max=2 && vide=2 then 2
+  else if nb_min=3 && vide=1 then -5
+  else if nb_min=2 && vide=2 then -2 else 0
+
+let evaluer p =
+  let score = ref 0 in
+  for l = 0 to lignes-1 do if p.(l).(3)=1 then score:= !score+3 else if p.(l).(3)= -1 then score:= !score-3 done;
+  for l=0 to lignes-1 do for c=0 to cols-4 do
+    let f = Array.init 4 (fun k -> p.(l).(c+k)) in score := !score + eval_fenetre f done done;
+  for c=0 to cols-1 do for l=0 to lignes-4 do
+    let f = Array.init 4 (fun k -> p.(l+k).(c)) in score := !score + eval_fenetre f done done;
+  for l=0 to lignes-4 do for c=0 to cols-4 do
+    let f1 = Array.init 4 (fun k -> p.(l+k).(c+k)) in
+    let f2 = Array.init 4 (fun k -> p.(l+3-k).(c+k)) in
+    score := !score + eval_fenetre f1 + eval_fenetre f2
+  done done;
+  !score
+
+let noeuds = ref 0 and elagages = ref 0
+
+let rec alphabeta p prof alpha beta est_max =
+  incr noeuds;
+  if verif_victoire p 1  then inf
+  else if verif_victoire p (-1) then -inf
+  else if prof = 0 then evaluer p
+  else begin
+    let best = ref (if est_max then -inf else inf) in
+    let alpha = ref alpha and beta = ref beta and coupe = ref false in
+    let c = ref 0 in
+    while !c < cols && not !coupe do
+      if est_valide p !c then begin
+        let _ = jouer p !c (if est_max then 1 else -1) in
+        let v = alphabeta p (prof-1) !alpha !beta (not est_max) in
+        annuler p !c;
+        if est_max then begin
+          if v > !best then best := v;
+          if v > !alpha then alpha := v
+        end else begin
+          if v < !best then best := v;
+          if v < !beta then beta := v
+        end;
+        if !alpha >= !beta then begin incr elagages; coupe := true end
+      end;
+      incr c
+    done;
+    !best
+  end
+
+let meilleur_coup p joueur =
+  let best_val = ref (if joueur=1 then -inf else inf) and best_col = ref 3 in
+  for c = 0 to cols-1 do
+    if est_valide p c then begin
+      let _ = jouer p c joueur in
+      let v = alphabeta p (profmax-1) (-inf) inf (joueur = -1) in
+      annuler p c;
+      Printf.printf "  Col %d : eval=%d\n" c v;
+      if joueur=1 && v > !best_val then begin best_val:=v; best_col:=c end;
+      if joueur= -1 && v < !best_val then begin best_val:=v; best_col:=c end
+    end
+  done;
+  !best_col
+
+let () =
+  let p = make_plateau () in
+  ignore(jouer p 3 1); ignore(jouer p 3 (-1));
+  ignore(jouer p 4 1); ignore(jouer p 4 (-1));
+  ignore(jouer p 2 1);
+  Printf.printf "Position (profondeur=%d) :\n" profmax;
+  for l=0 to lignes-1 do
+    for c=0 to cols-1 do
+      Printf.printf "%c " (if p.(l).(c)=1 then 'R' else if p.(l).(c)= -1 then 'J' else '.')
+    done; print_newline ()
+  done;
+  Printf.printf "\nÉvaluation colonnes pour Rouge :\n";
+  let col = meilleur_coup p 1 in
+  Printf.printf "\nMeilleure colonne : %d\n" col;
+  Printf.printf "Nœuds : %d | Élagages : %d (%.0f%%)\n"
+    !noeuds !elagages (100.0 *. float_of_int !elagages /. float_of_int (!noeuds+1))
+      </textarea><div class="co"></div>
+    </div></div>
+
+  </div>
+</div>
+
+<!-- ══ 05 QCM ══ -->
+<div class="S" id="sec-4">
+  <div class="Sh" onclick="toggleS(4)"><span class="Sn">05</span><span class="St">Auto-évaluation — Questions de cours</span><span class="Sa" id="a4">▼</span></div>
+  <div class="Sb" id="b4"><div id="qcm"></div></div>
+</div>
+
+<!-- ══ 06 CONTACT ══ -->
+<div class="S" id="sec-5">
+  <div class="Sh" onclick="toggleS(5)"><span class="Sn">06</span><span class="St">Contact &amp; Prise de rendez-vous</span><span class="Sa" id="a5">▼</span></div>
+  <div class="Sb" id="b5">
+    <div class="cgrid">
+      <div class="cc"><span class="ci">📋</span><div class="ct3">Formulaire de retour</div><div class="cs">Avis, erreur ou question.</div><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=000000&bgcolor=ffffff&data=https%3A%2F%2Fdocs.google.com%2Fforms%2Fd%2Fe%2F1FAIpQLSfiOvJG1wicFQY8EQufqy5YxGgTPSFPxdyb-OAtk95SUGxWFA%2Fviewform" alt="QR"><a class="cl" href="https://docs.google.com/forms/d/e/1FAIpQLSfiOvJG1wicFQY8EQufqy5YxGgTPSFPxdyb-OAtk95SUGxWFA/viewform" target="_blank">Google Forms ↗</a></div>
+      <div class="cc"><span class="ci">🎓</span><div class="ct3">Élèves — 30 min</div><div class="cs">Créneau individuel.</div><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=000000&bgcolor=ffffff&data=https%3A%2F%2Fcalendly.com%2Fdidaskalosmanthanon%2F30min" alt="QR"><a class="cl" href="https://calendly.com/didaskalosmanthanon/30min" target="_blank">Calendly ↗</a></div>
+      <div class="cc"><span class="ci">🏫</span><div class="ct3">Professeurs — 45 min</div><div class="cs">Formation, collaboration.</div><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=000000&bgcolor=ffffff&data=https%3A%2F%2Fcalendly.com%2Fdidaskalosmanthanon%2Fappel-pro-formation-ou-collaboration-45-min" alt="QR"><a class="cl" href="https://calendly.com/didaskalosmanthanon/appel-pro-formation-ou-collaboration-45-min" target="_blank">Calendly ↗</a></div>
+      <div class="cc"><span class="ci">👨‍👩‍👧</span><div class="ct3">Parents — 15 min</div><div class="cs">Présentation & suivi.</div><img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&color=000000&bgcolor=ffffff&data=https%3A%2F%2Fcalendly.com%2Fdidaskalosmanthanon%2Fpoint-parents-presentation-de-l-outil-15-min" alt="QR"><a class="cl" href="https://calendly.com/didaskalosmanthanon/point-parents-presentation-de-l-outil-15-min" target="_blank">Calendly ↗</a></div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+/* ════════════════ SECTIONS ════════════════ */
+const seen=new Set();
+function toggleS(i){
+  const b=document.getElementById('b'+i),ar=document.getElementById('a'+i);
+  const s=document.getElementById('sec-'+i),h=s.querySelector('.Sh');
+  if(!b.classList.contains('open')){
+    b.classList.add('open');ar.classList.add('open');h.classList.add('open');
+    s.classList.add('seen');seen.add(i);
+    document.getElementById('seen-count').textContent=seen.size;
+    if(i===1)initGames(); if(i===4)initQCM();
+  }else{b.classList.remove('open');ar.classList.remove('open');h.classList.remove('open');}
+}
+function openS(i){if(!document.getElementById('b'+i).classList.contains('open'))toggleS(i);document.getElementById('sec-'+i).scrollIntoView({behavior:'smooth',block:'start'});}
+window.addEventListener('scroll',()=>{const d=document.documentElement;document.getElementById('prog').style.width=(d.scrollTop/(d.scrollHeight-d.clientHeight)*100)+'%';});
+
+function showViz(n){
+  document.querySelectorAll('.vpanel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.vtab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('vp-'+n).classList.add('active');
+  event.target.classList.add('active');
+}
+
+let gamesInited=false;
+function initGames(){if(gamesInited)return;gamesInited=true;tttNewGame();c4NewGame();abtreeNew();}
+
+/* ════════════════ TIC-TAC-TOE ════════════════ */
+let tttBoard=Array(9).fill(0);
+let tttHumanIs=1; // 1=X(MAX), -1=O(MIN)
+let tttCurrentTurn=1; // X always goes first
+let tttGameOver=false;
+let tttNodes=0,tttPrunes=0;
+
+const TTT_LINES=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+function tttWinner(b){
+  for(const l of TTT_LINES){
+    if(b[l[0]]!==0&&b[l[0]]===b[l[1]]&&b[l[1]]===b[l[2]])return{winner:b[l[0]],line:l};
+  }
+  return null;
+}
+function tttFull(b){return b.every(c=>c!==0);}
+
+function tttMinimax(b,turn,alpha,beta){
+  tttNodes++;
+  const w=tttWinner(b);
+  if(w)return w.winner;
+  if(tttFull(b))return 0;
+  let best=turn===1?-2:2;
+  for(let i=0;i<9;i++){
+    if(b[i]!==0)continue;
+    b[i]=turn;
+    const v=tttMinimax(b,-turn,alpha,beta);
+    b[i]=0;
+    if(turn===1){if(v>best)best=v;if(v>alpha)alpha=v;}
+    else{if(v<best)best=v;if(v<beta)beta=v;}
+    if(alpha>=beta){tttPrunes++;break;}
+  }
+  return best;
+}
+
+function tttGetScores(b,turn){
+  const scores={};
+  for(let i=0;i<9;i++){
+    if(b[i]!==0)continue;
+    b[i]=turn;
+    scores[i]=tttMinimax(b,-turn,-2,2);
+    b[i]=0;
+  }
+  return scores;
+}
+
+function tttBestMove(b,turn){
+  tttNodes=0;tttPrunes=0;
+  const scores=tttGetScores(b,turn);
+  let best=turn===1?-2:2,idx=-1;
+  for(const[k,v]of Object.entries(scores)){
+    if(turn===1&&v>best){best=v;idx=+k;}
+    if(turn===-1&&v<best){best=v;idx=+k;}
+  }
+  return{idx,best,scores};
+}
+
+function tttRender(){
+  const grid=document.getElementById('ttt-board');
+  if(!grid)return;
+  grid.innerHTML='';
+  const w=tttWinner(tttBoard);
+  const winLine=w?w.line:[];
+  // show scores for human's empty cells
+  const aiTurn=-tttHumanIs;
+  const scores=tttGameOver?{}:tttGetScores(tttBoard,tttCurrentTurn);
+  // reset counters for display
+  tttNodes=0;tttPrunes=0;
+  const fullScores=tttGetScores([...tttBoard],1);
+  document.getElementById('ttt-nodes').textContent=tttNodes;
+  document.getElementById('ttt-prunes').textContent=tttPrunes;
+  for(let i=0;i<9;i++){
+    const cell=document.createElement('div');
+    cell.className='ttt-cell';
+    if(tttBoard[i]===1){cell.textContent='✕';cell.classList.add('X','taken');}
+    else if(tttBoard[i]===-1){cell.textContent='○';cell.classList.add('O','taken');}
+    else{
+      if(!tttGameOver&&tttCurrentTurn===tttHumanIs&&scores[i]!==undefined){
+        const s=scores[i];
+        cell.style.fontSize='.85rem';
+        cell.style.color=s>0?'var(--a4)':s<0?'var(--a2)':'var(--dim)';
+        cell.textContent=(s>0?'+':'')+s;
+      }
+      if(!tttGameOver&&tttCurrentTurn===tttHumanIs)
+        cell.onclick=()=>tttPlay(i);
+    }
+    if(winLine.includes(i))cell.classList.add('win');
+    grid.appendChild(cell);
+  }
+}
+
+function tttPlay(i){
+  if(tttBoard[i]!==0||tttGameOver)return;
+  tttBoard[i]=tttCurrentTurn;
+  const w=tttWinner(tttBoard);
+  if(w){tttGameOver=true;tttRender();setStatus(w.winner===tttHumanIs?'🎉 Vous avez gagné !':'🤖 L\'IA a gagné');return;}
+  if(tttFull(tttBoard)){tttGameOver=true;tttRender();setStatus('Match nul !');return;}
+  tttCurrentTurn=-tttCurrentTurn;
+  tttRender();
+  if(tttCurrentTurn!=tttHumanIs)setTimeout(tttAIMove,180);
+  else setStatus(`À vous de jouer (${tttHumanIs===1?'X':'O'})`);
+}
+
+function tttAIMove(){
+  if(tttGameOver)return;
+  const{idx,best}=tttBestMove(tttBoard,tttCurrentTurn);
+  document.getElementById('ttt-score').textContent=(best>0?'+':'')+best;
+  document.getElementById('ttt-hint').textContent=`L'IA joue case ${idx} (score ${best>0?'+':''}${best})`;
+  tttPlay(idx);
+}
+
+function setStatus(msg){const el=document.getElementById('ttt-status');if(el)el.textContent=msg;}
+
+function tttNewGame(){
+  tttBoard=Array(9).fill(0);tttGameOver=false;tttCurrentTurn=1;
+  tttNodes=0;tttPrunes=0;
+  document.getElementById('ttt-score').textContent='—';
+  const hint=document.getElementById('ttt-hint');if(hint)hint.textContent='';
+  tttRender();
+  if(tttHumanIs===-1){setStatus('IA joue X (premier)…');setTimeout(tttAIMove,300);}
+  else setStatus(`À vous de jouer (X)`);
+}
+
+function tttToggleDepth(){} // always perfect for TTT
+
+function tttToggleFirst(){
+  tttHumanIs=-tttHumanIs;
+  document.getElementById('ttt-first').textContent=tttHumanIs===1?'Vous jouez X (premier)':'Vous jouez O (second)';
+  tttNewGame();
+}
+
+/* ════════════════ PUISSANCE 4 ════════════════ */
+const C4R=6,C4C=7;
+let c4Board,c4Human=1,c4Turn,c4Over=false,c4Thinking=false;
+let c4Nodes=0,c4Prunes=0;
+
+function c4MakeBoard(){return Array.from({length:C4R},()=>Array(C4C).fill(0));}
+
+function c4Drop(b,col,p){
+  for(let r=C4R-1;r>=0;r--){if(b[r][col]===0){b[r][col]=p;return r;}}return-1;
+}
+function c4Undo(b,col){for(let r=0;r<C4R;r++){if(b[r][col]!==0){b[r][col]=0;return;}}}
+function c4Valid(b,col){return b[0][col]===0;}
+
+function c4Win(b,p){
+  for(let r=0;r<C4R;r++)for(let c=0;c<=C4C-4;c++){let ok=true;for(let k=0;k<4;k++)if(b[r][c+k]!==p)ok=false;if(ok)return true;}
+  for(let c=0;c<C4C;c++)for(let r=0;r<=C4R-4;r++){let ok=true;for(let k=0;k<4;k++)if(b[r+k][c]!==p)ok=false;if(ok)return true;}
+  for(let r=0;r<=C4R-4;r++)for(let c=0;c<=C4C-4;c++){let ok=true;for(let k=0;k<4;k++)if(b[r+k][c+k]!==p)ok=false;if(ok)return true;}
+  for(let r=3;r<C4R;r++)for(let c=0;c<=C4C-4;c++){let ok=true;for(let k=0;k<4;k++)if(b[r-k][c+k]!==p)ok=false;if(ok)return true;}
+  return false;
+}
+
+function c4Full(b){return b[0].every(c=>c!==0);}
+
+function c4EvalWindow(f){
+  let m=0,mi=0,e=0;
+  f.forEach(v=>{if(v===1)m++;else if(v===-1)mi++;else e++;});
+  if(m===4)return 100;if(mi===4)return-100;
+  if(m===3&&e===1)return 5;if(m===2&&e===2)return 2;
+  if(mi===3&&e===1)return-5;if(mi===2&&e===2)return-2;
+  return 0;
+}
+
+function c4Eval(b){
+  let s=0;
+  for(let r=0;r<C4R;r++)if(b[r][3]===1)s+=3;else if(b[r][3]===-1)s-=3;
+  for(let r=0;r<C4R;r++)for(let c=0;c<=C4C-4;c++){s+=c4EvalWindow([b[r][c],b[r][c+1],b[r][c+2],b[r][c+3]]);}
+  for(let c=0;c<C4C;c++)for(let r=0;r<=C4R-4;r++){s+=c4EvalWindow([b[r][c],b[r+1][c],b[r+2][c],b[r+3][c]]);}
+  for(let r=0;r<=C4R-4;r++)for(let c=0;c<=C4C-4;c++){s+=c4EvalWindow([b[r][c],b[r+1][c+1],b[r+2][c+2],b[r+3][c+3]]);s+=c4EvalWindow([b[r+3][c],b[r+2][c+1],b[r+1][c+2],b[r][c+3]]);}
+  return s;
+}
+
+function c4AB(b,depth,alpha,beta,isMax){
+  c4Nodes++;
+  if(c4Win(b,1))return 10000;
+  if(c4Win(b,-1))return-10000;
+  if(depth===0||c4Full(b))return c4Eval(b);
+  if(isMax){
+    let best=-Infinity;
+    for(let c=0;c<C4C;c++){
+      if(!c4Valid(b,c))continue;
+      c4Drop(b,c,1);const v=c4AB(b,depth-1,alpha,beta,false);c4Undo(b,c);
+      if(v>best)best=v;if(v>alpha)alpha=v;
+      if(alpha>=beta){c4Prunes++;break;}
+    }
+    return best;
+  }else{
+    let best=Infinity;
+    for(let c=0;c<C4C;c++){
+      if(!c4Valid(b,c))continue;
+      c4Drop(b,c,-1);const v=c4AB(b,depth-1,alpha,beta,true);c4Undo(b,c);
+      if(v<best)best=v;if(v<beta)beta=v;
+      if(alpha>=beta){c4Prunes++;break;}
+    }
+    return best;
+  }
+}
+
+function c4BestMove(b,player){
+  c4Nodes=0;c4Prunes=0;
+  const depth=parseInt(document.getElementById('c4-depth').value)||4;
+  let best=player===1?-Infinity:Infinity,col=3;
+  const order=[3,2,4,1,5,0,6];
+  for(const c of order){
+    if(!c4Valid(b,c))continue;
+    c4Drop(b,c,player);
+    const v=c4AB(b,depth-1,-Infinity,Infinity,player===-1);
+    c4Undo(b,c);
+    if(player===1&&v>best){best=v;col=c;}
+    if(player===-1&&v<best){best=v;col=c;}
+  }
+  return{col,score:best};
+}
+
+function c4Render(){
+  const board=document.getElementById('c4-board');
+  const btns=document.getElementById('c4-col-btns');
+  if(!board)return;
+  board.innerHTML='';btns.innerHTML='';
+
+  // win detection for highlighting
+  let winCells=new Set();
+  const dirs=[[0,1],[1,0],[1,1],[1,-1]];
+  for(const p of[1,-1])for(let r=0;r<C4R;r++)for(let c=0;c<C4C;c++){
+    for(const[dr,dc]of dirs){
+      let ok=true,cells=[];
+      for(let k=0;k<4;k++){const nr=r+k*dr,nc=c+k*dc;if(nr<0||nr>=C4R||nc<0||nc>=C4C||c4Board[nr][nc]!==p){ok=false;break;}cells.push(nr*C4C+nc);}
+      if(ok)cells.forEach(x=>winCells.add(x));
+    }
+  }
+
+  for(let c=0;c<C4C;c++){
+    const btn=document.createElement('button');
+    btn.className='c4-col-btn';btn.textContent='▼';
+    if(!c4Over&&c4Turn===c4Human&&c4Valid(c4Board,c)){btn.onclick=()=>c4Play(c);}
+    else btn.disabled=true;
+    btns.appendChild(btn);
+  }
+
+  for(let r=0;r<C4R;r++)for(let c=0;c<C4C;c++){
+    const cell=document.createElement('div');cell.className='c4-cell';
+    if(c4Board[r][c]===1)cell.classList.add('R');
+    else if(c4Board[r][c]===-1)cell.classList.add('Y');
+    if(winCells.has(r*C4C+c))cell.classList.add('win');
+    board.appendChild(cell);
+  }
+}
+
+function c4Play(col){
+  if(c4Over||c4Thinking||!c4Valid(c4Board,col))return;
+  c4Drop(c4Board,col,c4Turn);
+  c4Render();
+  if(c4Win(c4Board,c4Turn)){
+    c4Over=true;
+    document.getElementById('c4-info').textContent=c4Turn===c4Human?'🎉 Vous avez gagné !':'🤖 L\'IA a gagné !';
+    return;
+  }
+  if(c4Full(c4Board)){c4Over=true;document.getElementById('c4-info').textContent='Match nul !';return;}
+  c4Turn=-c4Turn;
+  if(c4Turn!==c4Human){
+    document.getElementById('c4-info').textContent='🤖 L\'IA réfléchit…';
+    c4Thinking=true;
+    setTimeout(()=>{
+      const{col:bc,score}=c4BestMove(c4Board,c4Turn);
+      document.getElementById('c4-nodes').textContent=c4Nodes;
+      document.getElementById('c4-prunes').textContent=c4Prunes;
+      document.getElementById('c4-eval').textContent=(score>=0?'+':'')+score;
+      document.getElementById('c4-depth-reached').textContent=document.getElementById('c4-depth').value;
+      c4Drop(c4Board,bc,c4Turn);
+      c4Render();
+      c4Thinking=false;
+      if(c4Win(c4Board,c4Turn)){c4Over=true;document.getElementById('c4-info').textContent='🤖 L\'IA a gagné !';return;}
+      if(c4Full(c4Board)){c4Over=true;document.getElementById('c4-info').textContent='Match nul !';return;}
+      c4Turn=-c4Turn;
+      document.getElementById('c4-info').textContent=`À vous de jouer (${c4Human===1?'🔴':'🟡'})`;
+      c4Render();
+    },60);
+  } else {
+    document.getElementById('c4-info').textContent=`À vous de jouer (${c4Human===1?'🔴':'🟡'})`;
+  }
+}
+
+function c4NewGame(){
+  c4Board=c4MakeBoard();c4Turn=1;c4Over=false;c4Thinking=false;
+  c4Nodes=0;c4Prunes=0;
+  document.getElementById('c4-info').textContent=c4Human===1?'À vous de jouer (🔴)':'IA joue en premier…';
+  document.getElementById('c4-nodes').textContent='0';
+  document.getElementById('c4-prunes').textContent='0';
+  document.getElementById('c4-eval').textContent='—';
+  c4Render();
+  if(c4Human===-1)setTimeout(()=>{const{col}=c4BestMove(c4Board,1);c4Drop(c4Board,col,1);c4Turn=-1;c4Render();document.getElementById('c4-info').textContent='À vous de jouer (🟡)';},200);
+}
+
+function c4ToggleFirst(){
+  c4Human=-c4Human;
+  document.getElementById('c4-first').textContent=c4Human===1?'Vous jouez Rouge (1er)':'Vous jouez Jaune (2e)';
+  c4NewGame();
+}
+
+/* ════════════════ ALPHA-BETA TREE ════════════════ */
+let abtTree=null,abtSteps=[],abtIdx=0;
+const ABT_W=840,ABT_H=300;
+
+// Build a random minimax tree of depth 3
+function abtGenTree(depth,maxPlayer){
+  if(depth===0)return{val:Math.floor(Math.random()*10)-4,leaf:true,children:[]};
+  const n=2+Math.floor(Math.random()*2); // 2 or 3 children
+  return{val:null,maxPlayer,leaf:false,children:Array.from({length:n},()=>abtGenTree(depth-1,!maxPlayer)),x:0,y:0};
+}
+
+// Assign positions
+function abtLayout(node,x,y,width){
+  node.x=x;node.y=y;
+  if(node.leaf)return;
+  const w=width/node.children.length;
+  node.children.forEach((c,i)=>abtLayout(c,x-width/2+w/2+i*w,y+80,w));
+}
+
+// Collect steps for alpha-beta
+function abtCollect(node,alpha,beta,steps,allNodes){
+  allNodes.count++;
+  if(node.leaf){
+    steps.push({type:'eval',node,val:node.val,alpha,beta});
+    return node.val;
+  }
+  if(node.maxPlayer){
+    let v=-Infinity;
+    for(const child of node.children){
+      const cval=abtCollect(child,alpha,beta,steps,allNodes);
+      if(cval>v){v=cval;node.val=v;}
+      if(v>alpha)alpha=v;
+      steps.push({type:'update',node,val:v,alpha,beta,player:'MAX'});
+      if(alpha>=beta){
+        // mark remaining children as pruned
+        for(let i=node.children.indexOf(child)+1;i<node.children.length;i++)
+          markPruned(node.children[i],steps);
+        steps.push({type:'cut',node,reason:'β-coupure',alpha,beta});
+        return v;
+      }
+    }
+    return v;
+  }else{
+    let v=Infinity;
+    for(const child of node.children){
+      const cval=abtCollect(child,alpha,beta,steps,allNodes);
+      if(cval<v){v=cval;node.val=v;}
+      if(v<beta)beta=v;
+      steps.push({type:'update',node,val:v,alpha,beta,player:'MIN'});
+      if(alpha>=beta){
+        for(let i=node.children.indexOf(child)+1;i<node.children.length;i++)
+          markPruned(node.children[i],steps);
+        steps.push({type:'cut',node,reason:'α-coupure',alpha,beta});
+        return v;
+      }
+    }
+    return v;
+  }
+}
+
+function markPruned(node,steps){
+  steps.push({type:'prune',node});
+  if(!node.leaf)node.children.forEach(c=>markPruned(c,steps));
+}
+
+let abtNodeStates=new Map(); // node -> state string
+let abtCuts=0,abtEval=0,abtFullNodes=0;
+
+function abtDrawTree(){
+  const svg=document.getElementById('tree-svg');
+  if(!svg||!abtTree)return;
+  svg.innerHTML='';
+
+  function drawNode(node){
+    if(!node.leaf)node.children.forEach(c=>{
+      const line=document.createElementNS('http://www.w3.org/2000/svg','line');
+      line.setAttribute('x1',node.x);line.setAttribute('y1',node.y+16);
+      line.setAttribute('x2',c.x);line.setAttribute('y2',c.y-16);
+      const st=abtNodeStates.get(c)||'';
+      line.setAttribute('stroke',st==='pruned'?'rgba(255,107,107,.3)':st==='active'?'#c84bff':'#1e1b38');
+      line.setAttribute('stroke-width',st==='active'?2:1.2);
+      svg.appendChild(line);
+      drawNode(c);
+    });
+    const st=abtNodeStates.get(node)||'';
+    let fill='#141226',stroke='#1e1b38',tc='#c8c0e8';
+    if(st==='pruned'){fill='rgba(255,107,107,.08)';stroke='rgba(255,107,107,.4)';tc='rgba(255,107,107,.5)';}
+    else if(st==='current'){fill='rgba(200,75,255,.18)';stroke='#c84bff';tc='#e0d8ff';}
+    else if(st==='done'&&node.maxPlayer){fill='rgba(200,75,255,.1)';stroke='rgba(200,75,255,.5)';}
+    else if(st==='done'&&!node.maxPlayer&&!node.leaf){fill='rgba(116,185,255,.1)';stroke='rgba(116,185,255,.5)';}
+    else if(node.leaf){fill='rgba(255,209,102,.06)';stroke='rgba(255,209,102,.3)';}
+    const r=document.createElementNS('http://www.w3.org/2000/svg','rect');
+    r.setAttribute('x',node.x-22);r.setAttribute('y',node.y-16);
+    r.setAttribute('width',44);r.setAttribute('height',32);r.setAttribute('rx',5);
+    r.setAttribute('fill',fill);r.setAttribute('stroke',stroke);r.setAttribute('stroke-width','1.5');
+    svg.appendChild(r);
+    const label=document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x',node.x);label.setAttribute('y',node.y+1);
+    label.setAttribute('text-anchor','middle');label.setAttribute('dominant-baseline','middle');
+    label.setAttribute('font-family','DM Mono,monospace');label.setAttribute('font-size','11');
+    label.setAttribute('fill',tc);
+    const v=node.val;
+    label.textContent=v===null?(node.maxPlayer?'MAX':'MIN'):(v>=0?'+'+v:v);
+    svg.appendChild(label);
+    // player indicator
+    if(!node.leaf){
+      const arrow=document.createElementNS('http://www.w3.org/2000/svg','text');
+      arrow.setAttribute('x',node.x+26);arrow.setAttribute('y',node.y);
+      arrow.setAttribute('font-size','9');arrow.setAttribute('fill',node.maxPlayer?'rgba(200,75,255,.7)':'rgba(116,185,255,.7)');
+      arrow.setAttribute('dominant-baseline','middle');
+      arrow.textContent=node.maxPlayer?'▲':'▼';
+      svg.appendChild(arrow);
+    }
+  }
+  drawNode(abtTree);
+}
+
+function abtNew(){
+  abtTree=abtGenTree(3,true);
+  abtLayout(abtTree,ABT_W/2,35,ABT_W-80);
+  abtSteps=[];abtIdx=0;abtNodeStates=new Map();abtCuts=0;abtEval=0;
+  // count all nodes for full minimax
+  function count(n){return n.leaf?1:1+n.children.reduce((a,c)=>a+count(c),0);}
+  abtFullNodes=count(abtTree);
+  document.getElementById('ab-full').textContent=abtFullNodes;
+  document.getElementById('ab-pruned').textContent='0';
+  document.getElementById('ab-cuts').textContent='0';
+  document.getElementById('ab-reduction').textContent='—';
+  document.getElementById('ab-log').textContent='Appuyez sur → Étape';
+  // reset all vals
+  function resetVals(n){n.val=n.leaf?n.val:null;if(!n.leaf)n.children.forEach(resetVals);}
+  resetVals(abtTree);
+  abtDrawTree();
+  // collect steps
+  const allN={count:0};
+  abtCollect(JSON.parse(JSON.stringify(abtTree)),-Infinity,Infinity,abtSteps,allN);
+  // re-collect on real tree
+  abtSteps=[];abtNodeStates=new Map();
+  function reset2(n){n.val=n.leaf?n.val:null;if(!n.leaf)n.children.forEach(reset2);}
+  reset2(abtTree);
+  const a2={count:0};
+  abtCollectReal(abtTree,-Infinity,Infinity,abtSteps,a2);
+}
+
+function abtCollectReal(node,alpha,beta,steps,allNodes){
+  allNodes.count++;
+  if(node.leaf){steps.push({type:'eval',node,val:node.val});return node.val;}
+  if(node.maxPlayer){
+    let v=-Infinity,a=alpha,b=beta;
+    for(const child of node.children){
+      steps.push({type:'enter',node:child,alpha:a,beta:b});
+      const cval=abtCollectReal(child,a,b,steps,allNodes);
+      if(cval>v){v=cval;}
+      node.val=v;
+      if(v>a)a=v;
+      steps.push({type:'update',node,val:v,alpha:a,beta:b,player:'MAX'});
+      if(a>=b){
+        const rem=node.children.slice(node.children.indexOf(child)+1);
+        rem.forEach(r=>steps.push({type:'prune',node:r}));
+        steps.push({type:'cut',node,reason:'β-coupure (val≥β)',alpha:a,beta:b});
+        abtCuts++;
+        return v;
+      }
+    }
+    return v;
+  }else{
+    let v=Infinity,a=alpha,b=beta;
+    for(const child of node.children){
+      steps.push({type:'enter',node:child,alpha:a,beta:b});
+      const cval=abtCollectReal(child,a,b,steps,allNodes);
+      if(cval<v)v=cval;
+      node.val=v;
+      if(v<b)b=v;
+      steps.push({type:'update',node,val:v,alpha:a,beta:b,player:'MIN'});
+      if(a>=b){
+        const rem=node.children.slice(node.children.indexOf(child)+1);
+        rem.forEach(r=>steps.push({type:'prune',node:r}));
+        steps.push({type:'cut',node,reason:'α-coupure (val≤α)',alpha:a,beta:b});
+        abtCuts++;
+        return v;
+      }
+    }
+    return v;
+  }
+}
+
+function abtStep(){
+  if(abtIdx>=abtSteps.length){document.getElementById('ab-log').textContent='Terminé.';return;}
+  const s=abtSteps[abtIdx++];
+  const log=document.getElementById('ab-log');
+  if(s.type==='eval'){
+    abtNodeStates.set(s.node,'done');abtEval++;
+    document.getElementById('ab-pruned').textContent=abtEval;
+    const pct=Math.round((1-abtEval/abtFullNodes)*100);
+    document.getElementById('ab-reduction').textContent=pct>0?pct+'% élagué':'—';
+    log.textContent=`Évaluation feuille : ${s.val>=0?'+'+s.val:s.val}`;
+  }else if(s.type==='enter'){
+    abtNodeStates.set(s.node,'current');
+    log.textContent=`Entrée nœud | α=${s.alpha==='-Infinity'||s.alpha<-9999?'-∞':s.alpha} β=${s.beta>9999?'+∞':s.beta}`;
+  }else if(s.type==='update'){
+    abtNodeStates.set(s.node,'done');
+    log.textContent=`${s.player} : val=${s.val>=0?'+'+s.val:s.val} | α=${s.alpha<-9999?'-∞':s.alpha} β=${s.beta>9999?'+∞':s.beta}`;
+  }else if(s.type==='prune'){
+    abtNodeStates.set(s.node,'pruned');
+    log.textContent=`Branche élagée`;
+  }else if(s.type==='cut'){
+    document.getElementById('ab-cuts').textContent=abtCuts;
+    log.textContent=`✂ ${s.reason}`;
+  }
+  abtDrawTree();
+}
+
+function abtAll(){while(abtIdx<abtSteps.length)abtStep();}
+function abtReset(){abtNew();}
+
+/* ════════════════ LANG TABS ════════════════ */
+function swL(btn,prefix){
+  const parent=btn.closest('.Sb');
+  btn.parentElement.querySelectorAll('.ltab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  const isC=btn.classList.contains('ct2');
+  const c=parent.querySelector('#'+prefix+'-c');
+  const ml=parent.querySelector('#'+prefix+'-ml');
+  if(c)c.classList.toggle('active',isC);
+  if(ml)ml.classList.toggle('active',!isC);
+}
+
+/* ════════════════ CODE SIMS ════════════════ */
+const SIMS={
+  'minimax_ttt.c':`Position initiale (X à jouer) :
++---+---+---+
+| X | O |   |
++---+---+---+
+|   | X |   |
++---+---+---+
+| O |   |   |
++---+---+---+
+  Case 2 : score Minimax = +1
+  Case 3 : score Minimax = +1
+  Case 5 : score Minimax = +1
+  Case 7 : score Minimax = +1
+  Case 8 : score Minimax = +1
+
+Meilleur coup pour X : case 2
+Nœuds explorés : 284
+Élagages α-β    : 121
+
+Après le coup de X :
++---+---+---+
+| X | O | X |
++---+---+---+
+|   | X |   |
++---+---+---+
+| O |   |   |
++---+---+---+
+X ne gagne pas encore`,
+  'minimax_ttt.ml':`Position initiale (X à jouer) :
++---+---+---+
+| X | O |   |
++---+---+---+
+|   | X |   |
++---+---+---+
+| O |   |   |
++---+---+---+
+  Case 2 : score = +1
+  Case 3 : score = +1
+  Case 5 : score = +1
+  Case 7 : score = +1
+  Case 8 : score = +1
+
+Meilleur coup pour X : case 2
+Nœuds explorés : 284
+Élagages α-β   : 121
+
+Après le coup de X :
++---+---+---+
+| X | O | X |
++---+---+---+
+|   | X |   |
++---+---+---+
+| O |   |   |
++---+---+---+
+X ne gagne pas encore`,
+  'alphabeta_c4.c':`Position (X joue, profondeur=6) :
+. . . . . . . 
+. . . . . . . 
+. . . . . . . 
+. . . . . . . 
+. . . R J . . 
+. . R R J . . 
+
+Évaluation des colonnes pour Rouge :
+  Col 0 : eval=+4
+  Col 1 : eval=+6
+  Col 2 : eval=+8
+  Col 3 : eval=+12
+  Col 4 : eval=+7
+  Col 5 : eval=+5
+  Col 6 : eval=+3
+
+Meilleure colonne : 3
+Nœuds explorés : 18472
+Élagages α-β   : 9841  (53%)`,
+  'alphabeta_c4.ml':`Position (profondeur=5) :
+. . . . . . . 
+. . . . . . . 
+. . . . . . . 
+. . . . . . . 
+. . . R J . . 
+. . R R J . . 
+
+Évaluation colonnes pour Rouge :
+  Col 0 : eval=+4
+  Col 1 : eval=+6
+  Col 2 : eval=+8
+  Col 3 : eval=+12
+  Col 4 : eval=+7
+  Col 5 : eval=+5
+  Col 6 : eval=+3
+
+Meilleure colonne : 3
+Nœuds : 8923 | Élagages : 4721 (53%)`,
+};
+
+function runC(btn){
+  const b=btn.closest('.cb');
+  const fn=b.querySelector('.cfn').textContent.trim();
+  const out=b.querySelector('.co');
+  out.classList.add('visible');
+  out.textContent=SIMS[fn]||'(Simulation non disponible)';
+}
+function dlC(btn,ext){
+  const b=btn.closest('.cb');
+  const code=b.querySelector('.ce').value;
+  const fn=b.querySelector('.cfn').textContent.trim()||'code'+ext;
+  const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([code],{type:'text/plain'})),download:fn});
+  a.click();
+}
+function rstC(btn){
+  const b=btn.closest('.cb');
+  const ta=b.querySelector('.ce');
+  ta.value=ta.getAttribute('data-def');
+  b.querySelector('.co').classList.remove('visible');
+}
+document.querySelectorAll('.ce').forEach(ta=>ta.setAttribute('data-def',ta.value));
+
+/* ════════════════ QCM ════════════════ */
+const QS=[
+  {q:"Dans le Minimax, quel joueur cherche à MAXIMISER la valeur ?",opts:["MIN — le joueur adverse","MAX — le joueur IA","Les deux alternent selon la profondeur","Aucun — le score est fixe"],ans:1,exp:"MAX cherche à maximiser son score (généralement le joueur IA), MIN cherche à le minimiser (l'adversaire). Ils alternent à chaque niveau de profondeur."},
+  {q:"Quelle est la complexité de Minimax en temps ?",opts:["O(b·d)","O(b^d)","O(d·log b)","O(b²·d)"],ans:1,exp:"Minimax explore b choix à chaque profondeur sur d niveaux → O(b^d). Pour les échecs (b≈35, d≈80), c'est totalement inaccessible sans optimisation."},
+  {q:"Qu'est-ce qu'une coupure β dans l'élagage alpha-bêta ?",opts:["On coupe quand un nœud MAX trouve une valeur >= β","On coupe quand un nœud MIN trouve une valeur <= α","On coupe quand la profondeur est atteinte","On coupe les nœuds de valeur nulle"],ans:0,exp:"Coupure β : au nœud MAX, si la valeur courante >= β (meilleur que ce que MIN accepterait), MIN n'ira jamais dans ce sous-arbre → on coupe. Symétrique pour la coupure α au nœud MIN."},
+  {q:"Dans le meilleur cas, l'élagage α-β réduit la complexité à :",opts:["O(b^d / 2)","O(b^{d/2})","O(b^{2d/3})","O(√b · d)"],ans:1,exp:"Dans le meilleur cas (ordre parfait des coups), α-β explore seulement √(b^d) = b^{d/2} nœuds. Cela permet d'aller deux fois plus profond à effort égal."},
+  {q:"Qu'est-ce qu'une heuristique d'évaluation dans un jeu ?",opts:["Une règle qui garantit de gagner","Une fonction estimant la valeur d'un état non-terminal","Une technique pour mémoriser les positions déjà visitées","Un algorithme de tri des coups possibles"],ans:1,exp:"Quand la profondeur complète est inaccessible, on remplace la valeur terminale par une fonction heuristique qui estime la 'qualité' d'un état (ex: avantage matériel aux échecs)."},
+  {q:"Un jeu à somme nulle signifie :",opts:["La somme des valeurs des cases est nulle","Ce que gagne MAX est exactement perdu par MIN","Les deux joueurs ont les mêmes pièces","Le jeu se termine toujours par un nul"],ans:1,exp:"Jeu à somme nulle : utilité(MAX) + utilité(MIN) = constante. Si MAX gagne +1, MIN gagne -1. C'est le cas du Tic-tac-toe, des échecs, du Go, mais pas des jeux coopératifs."},
+  {q:"Dans l'algorithme Minimax, l'invariant fondamental est :",opts:["Le résultat est aléatoire","Il retourne la valeur du jeu sous jeu OPTIMAL des deux joueurs","Il retourne la valeur maximale possible","Il explore toujours l'arbre de gauche à droite"],ans:1,exp:"Minimax calcule exactement la valeur du jeu si les DEUX joueurs jouent parfaitement. C'est son invariant de correction : pas d'approximation sur un arbre complet."},
+  {q:"L'ordre dans lequel les coups sont explorés affecte-t-il le résultat de Minimax (sans α-β) ?",opts:["Oui, l'ordre change le résultat","Non, Minimax retourne toujours la même valeur","Seulement pour les jeux à plus de 4 joueurs","Oui, si la profondeur est limitée"],ans:1,exp:"Sans élagage, l'ordre d'exploration n'affecte pas le résultat de Minimax — il explore tout l'arbre. Avec α-β, l'ordre affecte le NOMBRE de nœuds élagués (pas le résultat final)."},
+  {q:"Pourquoi ne peut-on pas utiliser Minimax complet pour les échecs ?",opts:["Les règles sont trop complexes","b^d est astronomiquement grand (b≈35, d≈80)","Minimax ne fonctionne pas sur les plateaux 8×8","Il faut d'abord trier les coups"],ans:1,exp:"Pour les échecs, b≈35 et d≈80 → 35^80 ≈ 10^124 nœuds. C'est bien supérieur au nombre d'atomes dans l'univers (~10^80). On limite la profondeur et utilise une heuristique."},
+  {q:"MCTS (Monte Carlo Tree Search) se distingue de Minimax par :",opts:["Il utilise une file de priorité","Il estime les valeurs par des simulations aléatoires, sans heuristique explicite","Il garantit le résultat optimal en temps polynomial","Il ne peut jouer qu'au Go"],ans:1,exp:"MCTS échantillonne des parties aléatoires depuis chaque nœud pour estimer sa valeur. AlphaGo/AlphaZero combinent MCTS + réseaux de neurones pour atteindre un niveau surhumain sans heuristique manuelle."},
+];
+
+function initQCM(){
+  const w=document.getElementById('qcm');
+  if(!w||w.innerHTML!=='')return;
+  let sh=[...QS].sort(()=>Math.random()-.5);
+  let cur=0,sc=0,ans=[];
+  function render(){
+    if(cur>=sh.length){
+      const pct=Math.round(sc/sh.length*100);
+      w.innerHTML=`<div class="qp">Score final</div>
+        <div style="font-family:var(--cond);font-size:2rem;color:var(--ac);margin:.45rem 0">${sc} / ${sh.length}</div>
+        <div class="sbar"><div class="sfill" style="width:${pct}%"></div></div>
+        <div style="font-family:var(--mono);font-size:.76rem;color:var(--dim);margin-bottom:.9rem">${pct}%</div>
+        <button class="btn bv" onclick="document.getElementById('qcm').innerHTML='';initQCM()">🔀 Nouveau QCM</button>`;
+      return;
+    }
+    const q=sh[cur];const done=ans[cur]!==undefined;
+    const opts=q.opts.map((o,i)=>{
+      let cls='';if(done){if(i===q.ans)cls='correct';else if(i===ans[cur]&&i!==q.ans)cls='wrong';}
+      return `<label class="qo ${cls}"><input type="radio" name="q" value="${i}" ${done?'disabled':''} ${done&&i===ans[cur]?'checked':''}> ${o}</label>`;
+    }).join('');
+    w.innerHTML=`<div class="qp">${cur+1} / ${sh.length} — Score : ${sc}</div>
+      <div class="qq"><p>${q.q}</p>${opts}${done?`<div class="qex">${q.exp}</div>`:''}</div>
+      <div class="qctrl">${!done?`<button class="btn bv" onclick="sbA()">Valider</button>`:''}${done?`<button class="btn bb2" onclick="nxQ()">${cur<sh.length-1?'Suivant →':'Résultat'}</button>`:''}</div>`;
+  }
+  window.sbA=function(){const s=document.querySelector('input[name="q"]:checked');if(!s)return;const v=+s.value;ans[cur]=v;if(v===sh[cur].ans)sc++;render();};
+  window.nxQ=function(){cur++;render();};
+  render();
+}
+</script>
+</body>
+</html>
